@@ -1,6 +1,6 @@
 function [im2 delta] = rigid2(im1,im2,n)
 %[im2 delta] = rigid2(im1,im2,n)
-% aligns im2 with im1 using 2D rigid body registration
+% aligns im2 with im1 using 2d rigid body registration
 % -accepts 2D image, or stack of 2d images [nx ny ns]
 % -n is the number of histogram bins (max 256)
 % -im2 is returned registered using interp2
@@ -9,8 +9,11 @@ function [im2 delta] = rigid2(im1,im2,n)
 % Ref: Lu et al (doi.org/10.1016/j.compmedimag.2007.12.001)
 %
 %% handle inputs
-if ~isreal(im1) || ~isreal(im2) || ~isequal(size(im1),size(im2)) || ndims(im1)<2
-    error('im1 and im2 must be real images of the same size.');
+if ~isreal(im1) || ~isreal(im2) || nnz(isfinite(im1)==0) || nnz(isfinite(im2)==0)
+    error('im1 and im2 must be real valued.');
+end
+if ~isequal(size(im1),size(im2)) || ndims(im1)<2 || any(size(im1)<=1)
+    error('im1 and im2 must be 3d arrays of the same size.');
 end
 
 % Terrel-Scott rule (max 256)
@@ -51,7 +54,11 @@ y2 = mod(y2,ny)+1;
 [S L] = bounds(im2(:));
 for s = 1:ns
     tmp = cast(im2(:,:,s),'like',x2); % cast to gpu/double
-    tmp = interp2(tmp,y2,x2,'cubic'); % 'spline' fails on gpu
+    try
+        tmp = interp2(tmp,y2,x2,'cubic',0); % 'cubic' fails on gpu
+    catch
+        tmp = interp2(tmp,y2,x2,'linear',0); % fallback to linear
+    end
     im2(:,:,s) = reshape(tmp,nx,ny); % preserve original type
 end
 im2 = min(max(im2,S),L); % preserve bounds (e.g. nonnegative)
