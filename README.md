@@ -1,6 +1,6 @@
 # rigidbodyregistration
 
-MATLAB code for rigid body registration in **2d [dx dy zrot]** or **3d [dx dy dz xrot yrot zrot]** based on:
+MATLAB code for rigid body registration in **2d [dx dy zrot]** and **3d [dx dy dz xrot yrot zrot]** based on:
 
 ### Mutual information-based multimodal image registration using a novel joint histogram estimation
 Xuesong Lu, Su Zhang, He Su, Yazhu Chen.
