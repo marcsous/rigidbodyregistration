@@ -45,24 +45,26 @@ delta = fminunc(cost,[0 0 0 0 0 0],opts)
 
 % get coordinates of im2
 [~,~,x2,y2,z2] = cost(delta);
+clear cost uim1 uim2 opts
 
 % wrap edges and use 1-based indexing
 x2 = mod(x2,nx)+1;
 y2 = mod(y2,ny)+1;
 z2 = mod(z2,nz)+1;
 
-% interpolate im2 to im1
-[S L] = bounds(im2(:));
+% interpolate im2 to im1 - spline/cubic may fail on gpu
+tmp = cast(im2,'like',x2);
 for s = 1:ns
-    tmp = cast(im2(:,:,:,s),'like',x2); % cast to gpu/double
     try
-        tmp = interp3(tmp,y2,x2,z2,'cubic',0); % 'cubic' fails on gpu
+        tmp(:,:,:,s) = interp3(tmp(:,:,:,s),y2,x2,z2,'cubic',0);
     catch
-        tmp = interp3(tmp,y2,x2,z2,'linear',0); % fallback to linear
+        tmp(:,:,:,s) = interp3(tmp(:,:,:,s),y2,x2,z2,'linear',0);
     end
-    im2(:,:,:,s) = reshape(tmp,nx,ny,nz); % preserve original type
 end
-im2 = min(max(im2,S),L); % preserve bounds (e.g. nonnegative)
+
+% preserve bounds (nonnegative) and type
+[S L] = bounds(im2(:));
+im2 = min(max(tmp,S),L);
 
 %% mutual information by joint histogram estimation (hpv)
 function [fval grad x2 y2 z2] = hpv(im1,im2,delta,n)
@@ -116,7 +118,10 @@ z2 = nz/2 + delta(3) + P * Rxyz(:,3);
 
 % early return for coordinates only
 if nargout>2
-    fval = []; grad = []; return;
+    x2 = reshape(x2,[nx ny nz]);
+    y2 = reshape(y2,[nx ny nz]);
+    z2 = reshape(z2,[nx ny nz]);
+    fval = 0; grad = 0; return;
 end
 
 % vectorize slice groups
