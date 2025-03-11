@@ -60,6 +60,7 @@ for s = 1:ns
         tmp(:,:,s) = interp2(tmp(:,:,s),y2,x2,'linear',0);
     end
 end
+tmp = cast(tmp,'like',im2);
 
 % preserve bounds (nonnegative) and type
 [S L] = bounds(im2(:));
