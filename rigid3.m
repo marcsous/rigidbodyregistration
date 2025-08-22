@@ -12,8 +12,8 @@ function [im2 delta] = rigid3(im1,im2,n)
 if ~isreal(im1) || ~isreal(im2) || nnz(isfinite(im1)==0) || nnz(isfinite(im2)==0)
     error('im1 and im2 must be real valued.');
 end
-if ~isequal(size(im1),size(im2)) || ndims(im1)<3 || any(size(im1)<=1)
-    error('im1 and im2 must be 3d arrays of the same size.');
+if ~isequal(size(im1),size(im2)) || ndims(im1)<3
+    error('im1 and im2 must be 3d-4d arrays of the same size.');
 end
 
 % Terrel-Scott rule (max 256)
@@ -52,20 +52,25 @@ x2 = mod(x2,nx)+1;
 y2 = mod(y2,ny)+1;
 z2 = mod(z2,nz)+1;
 
-% interpolate im2 to im1 - spline/cubic may fail on gpu
-tmp = cast(im2,'like',x2);
+% interpolate im2 to im1
 for s = 1:ns
-    try
-        tmp(:,:,:,s) = interp3(tmp(:,:,:,s),y2,x2,z2,'cubic',0);
-    catch
-        tmp(:,:,:,s) = interp3(tmp(:,:,:,s),y2,x2,z2,'linear',0);
-    end
-end
-tmp = cast(tmp,'like',im2);
 
-% preserve bounds (nonnegative) and type
-[S L] = bounds(im2(:));
-im2 = min(max(tmp,S),L);
+    % current slab
+    curr = im2(:,:,:,s);
+
+    % preserve bounds (e.g. nonnegative)
+    [S L] = bounds(reshape(curr,[],1));
+
+    % spline/cubic may fail on gpu
+    try
+        curr = interp3(curr,y2,x2,z2,'cubic',0);
+    catch
+        curr = interp3(curr,y2,x2,z2,'linear',0);
+    end
+
+    im2(:,:,:,s) = min(max(curr,S),L);
+
+end
 
 %% mutual information by joint histogram estimation (hpv)
 function [fval grad x2 y2 z2] = hpv(im1,im2,delta,n)
