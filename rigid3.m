@@ -1,10 +1,10 @@
 function [im2 delta] = rigid3(im1,im2,n)
 %[im2 delta] = rigid3(im1,im2,n)
 % aligns im2 with im1 using rigid body registration
-% -accepts 3d images or stack of 3d images [nx ny nz (ns)]
-% -n is the number of histogram bins (max 256)
-% -im2 is returned registered using interp3
-% -delta is the shifts [dx dy dz xrot yrot zrot]
+%  -accepts 3d images or stack of 3d images [nx ny nz (ns)]
+%  -n (optional) is the number of histogram bins (max 256)
+%  -im2 is returned registered using interp3
+%  -delta is the shifts [dx dy dz xrot yrot zrot]
 %
 % Ref: Lu et al (doi.org/10.1016/j.compmedimag.2007.12.001)
 %
