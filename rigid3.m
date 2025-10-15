@@ -56,7 +56,7 @@ z2 = mod(z2,nz)+1;
 for s = 1:ns
 
     % current slab
-    curr = im2(:,:,:,s);
+    curr = cast(im2(:,:,:,s),'like',x2);
 
     % preserve bounds (e.g. nonnegative)
     [S L] = bounds(reshape(curr,[],1));

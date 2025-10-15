@@ -55,7 +55,7 @@ y2 = mod(y2,ny)+1;
 for s = 1:ns
     
     % current slice
-    curr = im2(:,:,s);
+    curr = cast(im2(:,:,s),'like',x2);
 
     % preserve bounds (e.g. nonnegative)
     [S L] = bounds(reshape(curr,[],1));
