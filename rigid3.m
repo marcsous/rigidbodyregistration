@@ -22,7 +22,7 @@ elseif numel(voxel)~=3 || ~isreal(voxel) || nnz(voxel<=0) || nnz(~isfinite(voxel
 end
 
 % isotropic resolution unit used for registration 
-unit = mean(voxel) ; % 1.0; 
+unit = mean(voxel); % 1.0; 
 
 %% input arrays at unit isotropic resolution for registration
 try
@@ -91,7 +91,7 @@ end
 im2 = min(max(im2,S),L);
 
 %% rigid body coordinates on a grid with spacing of "voxel"
-function [x2 y2 z2 P Dx Dy Dz] = get_coords(sz,voxel,delta)
+function [x2 y2 z2 PDx PDy PDz] = get_coords(sz,voxel,delta)
 
 nx = sz(1); ny = sz(2); nz = sz(3);
 
@@ -118,20 +118,27 @@ y2 = (P*Rxyz(:,2) + delta(2)) / voxel(2) + ny/2;
 z2 = (P*Rxyz(:,3) + delta(3)) / voxel(3) + nz/2;
 
 % partial derivatives of Rxyz wrt delta(4-6)
-Dx = [        -c6*s4,         -s4*s6,   -c4;
-            c4*c6*s5,       c4*s5*s6,-s4*s5;
-            c4*c5*c6,       c4*c5*s6,-c5*s4];
-Dy = [             0,              0,     0;
-      c5*c6*s4+s5*s6,-c6*s5+c5*s4*s6, c4*c5;
-      c5*s6-c6*s4*s5,-c5*c6-s4*s5*s6,-c4*s5];
-Dz = [        -c4*s6,          c4*c6,     0;
-     -c5*c6-s4*s5*s6,-c5*s6+c6*s4*s5,     0;
-      c6*s5-c5*s4*s6, c5*c6*s4+s5*s6,     0];
+PDx = P*[        -c6*s4,         -s4*s6,   -c4;
+               c4*c6*s5,       c4*s5*s6,-s4*s5;
+               c4*c5*c6,       c4*c5*s6,-c5*s4];
+
+PDy = P*[             0,              0,     0;
+         c5*c6*s4+s5*s6,-c6*s5+c5*s4*s6, c4*c5;
+         c5*s6-c6*s4*s5,-c5*c6-s4*s5*s6,-c4*s5];
+
+PDz = P*[        -c4*s6,          c4*c6,     0;
+        -c5*c6-s4*s5*s6,-c5*s6+c6*s4*s5,     0;
+         c6*s5-c5*s4*s6, c5*c6*s4+s5*s6,     0];
 
 %% mutual information by joint histogram estimation (hpv)
 function [fval grad] = hpv(im1,im2,delta,n,voxel)
 
 [nx ny nz ns] = size(im1);
+
+nx = single(nx);
+ny = single(ny);
+nz = single(nz);
+ns = single(ns);
 
 if isa(im1,'gpuArray')
     nx = gpuArray(nx);
@@ -139,7 +146,7 @@ if isa(im1,'gpuArray')
     nz = gpuArray(nz);
 end
 
-[x2 y2 z2 P Dx Dy Dz] = get_coords([nx ny nz],voxel,delta);
+[x2 y2 z2 PDx PDy PDz] = get_coords([nx ny nz],voxel,delta);
 
 % vectorize slab groups
 im1 = reshape(im1,nx*ny*nz,ns);
@@ -181,16 +188,16 @@ for i = -1:2
                     case 2; f = (0-sindx).*(1+cosdy).*(1+cosdz)*pi/2/voxel(1); % df/dx
                     case 3; f = (1+cosdx).*(0-sindy).*(1+cosdz)*pi/2/voxel(2); % df/dy
                     case 4; f = (1+cosdx).*(1+cosdy).*(0-sindz)*pi/2/voxel(3); % df/dz
-                    case 5; f = sum(F.*(P*Dx),2)*pi/180;                       % df/dxrot
-                    case 6; f = sum(F.*(P*Dy),2)*pi/180;                       % df/dyrot
-                    case 7; f = sum(F.*(P*Dz),2)*pi/180;                       % df/dzrot
+                    case 5; f = dot(F,PDx,2)*pi/180;                           % df/dxrot
+                    case 6; f = dot(F,PDy,2)*pi/180;                           % df/dyrot
+                    case 7; f = dot(F,PDz,2)*pi/180;                           % df/dzrot
                 end
 
                 % help with out-of-memory issues
                 if m==2; F(:,1) = f; clear sindx; end
                 if m==3; F(:,2) = f; clear sindy cosdz; end
                 if m==4; F(:,3) = f; clear sindz cosdx cosdy; end
-                
+    
                 if ns>1; f = repmat(f,ns,1); end
                 h(:,:,m) = h(:,:,m) + accumarray(index,f,[n n]);
 
@@ -211,13 +218,13 @@ pB = reshape(pB,[],7);
 HA = plogp(pA(:,1));
 HB = plogp(pB(:,1));
 HAB = plogp(h(:,1));
-fval = gather(HA+HB-HAB);
+fval = gather(double(HA+HB-HAB));
 
 % partial derivatives
 HA = dplogp(pA(:,2:7),pA(:,1));
 HB = dplogp(pB(:,2:7),pB(:,1));
 HAB = dplogp(h(:,2:7),h(:,1));
-grad = gather(HA+HB-HAB);
+grad = gather(double(HA+HB-HAB));
 grad = reshape(grad,size(delta));
 
 %% perform log sums without NaN or Inf values

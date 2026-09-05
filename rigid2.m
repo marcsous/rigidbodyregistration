@@ -19,7 +19,7 @@ elseif numel(voxel)~=2 || ~isreal(voxel) || any(voxel<=0) || any(~isfinite(voxel
 end
 
 % isotropic resolution unit used for registration 
-unit = mean(voxel) ; % 1.0; 
+unit = mean(voxel); % 1.0; 
 
 %% copy of input arrays for registration
 try
@@ -100,7 +100,7 @@ end
 im2 = min(max(im2,S),L);
 
 %% rigid body coordinates on a grid with spacing of "voxel"
-function [x2 y2 P Dz] = get_coords(sz,voxel,delta)
+function [x2 y2 PDz] = get_coords(sz,voxel,delta)
 
 nx = sz(1); ny = sz(2);
 
@@ -122,12 +122,16 @@ x2 = (P*Rz(:,1) + delta(1)) / voxel(1) + nx/2;
 y2 = (P*Rz(:,2) + delta(2)) / voxel(2) + ny/2;
 
 % partial derivative of Rz wrt delta(3)
-Dz = [-sindzrot,+cosdzrot;+cosdzrot,-sindzrot];
+PDz = P*[-sindzrot,+cosdzrot;+cosdzrot,-sindzrot];
 
 %% mutual information by joint histogram estimation (hpv)
 function [fval grad] = hpv(im1,im2,delta,n,voxel)
 
 [nx ny ns] = size(im1);
+
+nx = single(nx);
+ny = single(ny);
+ns = single(ns);
 
 if isa(im1,'gpuArray')
     nx = gpuArray(nx);
@@ -135,7 +139,7 @@ if isa(im1,'gpuArray')
     ns = gpuArray(ns);
 end
 
-[x2 y2 P Dz] = get_coords([nx ny],voxel,delta);
+[x2 y2 PDz] = get_coords([nx ny],voxel,delta);
 
 % vectorize slices
 im1 = reshape(im1,nx*ny,ns);
@@ -170,7 +174,7 @@ for i = -1:2
                 case 1; f = (1+cosdx).*(1+cosdy);               % f
                 case 2; f = (0-sindx).*(1+cosdy)*pi/2/voxel(1); % df/dx
                 case 3; f = (1+cosdx).*(0-sindy)*pi/2/voxel(2); % df/dy
-                case 4; f = sum(F.*(P*Dz),2)*pi/180;            % df/dzrot
+                case 4; f = dot(F,PDz,2)*pi/180;                % df/dzrot
             end
 
             % help with out-of-memory issues
@@ -196,13 +200,13 @@ pB = reshape(pB,[],4);
 HA = plogp(pA(:,1));
 HB = plogp(pB(:,1));
 HAB = plogp(h(:,1));
-fval = gather(HA+HB-HAB);
+fval = gather(double(HA+HB-HAB));
 
 % partial derivatives
 HA = plogdp(pA(:,1),pA(:,2:4));
 HB = plogdp(pB(:,1),pB(:,2:4));
 HAB = plogdp(h(:,1),h(:,2:4));
-grad = gather(HA+HB-HAB);
+grad = gather(double(HA+HB-HAB));
 grad = reshape(grad,size(delta));
 
 %% perform log sums without NaN or Inf values
