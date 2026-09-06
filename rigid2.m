@@ -21,7 +21,14 @@ end
 % isotropic resolution unit used for registration 
 unit = mean(voxel); % 1.0; 
 
-%% copy of input arrays for registration
+%% input arrays at isotropic resolution for registration
+sz = size(im2); % original size
+
+im1 = squeeze(im1);
+im2 = squeeze(im2);
+
+[nx ny ns] = size(im2);
+
 try
     uim1 = gpuArray(im1);
     uim2 = gpuArray(im2);
@@ -30,7 +37,7 @@ catch
     uim2 = im2;
 end
 
-% interpolate to "1x1x1" resolution
+% interpolate to unit isotropic resolution (in plane)
 for dim = 1:2
     N = round(size(im2,dim) * voxel(dim) / unit);
     uim1 = interpft(uim1,N,dim);
@@ -97,12 +104,16 @@ for s = 1:ns
         im2(:,:,s) = interp2(im2(:,:,s),y2,x2,'nearest',0);
     end
 end
+
+% return in same form as original 
+im2 = reshape(im2,sz);
 im2 = min(max(im2,S),L);
 
 %% rigid body coordinates on a grid with spacing of "voxel"
 function [x2 y2 PDz] = get_coords(sz,voxel,delta)
 
-nx = sz(1); ny = sz(2);
+% single precision gives identical results to double
+nx = single(sz(1)); ny = single(sz(2));
 
 % coordinates of im1 (centered at 0 0)
 [x1 y1] = ndgrid(-nx/2:nx/2-1,-ny/2:ny/2-1);
@@ -128,10 +139,6 @@ PDz = P*[-sindzrot,+cosdzrot;+cosdzrot,-sindzrot];
 function [fval grad] = hpv(im1,im2,delta,n,voxel)
 
 [nx ny ns] = size(im1);
-
-nx = single(nx);
-ny = single(ny);
-ns = single(ns);
 
 if isa(im1,'gpuArray')
     nx = gpuArray(nx);

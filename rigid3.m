@@ -24,7 +24,14 @@ end
 % isotropic resolution unit used for registration 
 unit = mean(voxel); % 1.0; 
 
-%% input arrays at unit isotropic resolution for registration
+%% input arrays at isotropic resolution for registration
+sz = size(im2); % original size
+
+im1 = squeeze(im1);
+im2 = squeeze(im2);
+
+[nx ny nz ns] = size(im2);
+
 try
     uim1 = gpuArray(im1);
     uim2 = gpuArray(im2);
@@ -35,7 +42,7 @@ end
 
 % interpolate to unit isotropic resolution
 for dim = 1:3
-    N = round(size(im2,dim) * voxel(dim) / unit);
+    N = round(size(uim2,dim) * voxel(dim) / unit);
     uim1 = interpft(uim1,N,dim);
     uim2 = interpft(uim2,N,dim);
 end
@@ -62,8 +69,6 @@ fprintf('%s: %+.2f %+.2f %+.2f %+.2f %+.2f %+.2f (%.1f sec)\n',mfilename,delta,t
 % convert shifts from isotropic to native voxels
 delta(1:3) = delta(1:3) .* unit;
 
-[nx ny nz ns] = size(im2);
-
 if isa(im2,'gpuArray')
     nx = gpuArray(nx);
     ny = gpuArray(ny);
@@ -88,12 +93,16 @@ for s = 1:ns
         im2(:,:,:,s) = interp3(im2(:,:,:,s),y2,x2,z2,'nearest',0);
     end
 end
+
+% return in same form as original 
+im2 = reshape(im2,sz);
 im2 = min(max(im2,S),L);
 
 %% rigid body coordinates on a grid with spacing of "voxel"
 function [x2 y2 z2 PDx PDy PDz] = get_coords(sz,voxel,delta)
 
-nx = sz(1); ny = sz(2); nz = sz(3);
+% single precision gives identical results to double
+nx = single(sz(1)); ny = single(sz(2)); nz = single(sz(3));
 
 % coordinates of im1 (centered at 0 0 0)
 [x1 y1 z1] = ndgrid(-nx/2:nx/2-1,-ny/2:ny/2-1,-nz/2:nz/2-1);
@@ -134,11 +143,6 @@ PDz = P*[        -c4*s6,          c4*c6,     0;
 function [fval grad] = hpv(im1,im2,delta,n,voxel)
 
 [nx ny nz ns] = size(im1);
-
-nx = single(nx);
-ny = single(ny);
-nz = single(nz);
-ns = single(ns);
 
 if isa(im1,'gpuArray')
     nx = gpuArray(nx);
